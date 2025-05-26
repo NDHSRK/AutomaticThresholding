@@ -94,7 +94,8 @@ class SaturationDirection(Enum):
 ##**TODO How to make this function generic so that it will work on both
 # HSV and grayscale images - after all, both modify only a single
 # parameter: saturation threshold for HSV cv2.inRange() and grayscale
-# threshold for cv2.threshold().
+# threshold for cv2.threshold(). In Java this would be a job for a
+# lambda.
 def iterateThreshold(p_hsv_image, p_hsv_hue_low, p_hsv_hue_high, saturation_threshold, value_threshold,
                      saturation_direction,
                      min_sample_area, max_sample_area,
