@@ -26,7 +26,6 @@ def find_color_card(image):
     arucoDict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_ARUCO_ORIGINAL)
     arucoParams = cv2.aruco.DetectorParameters()
     detector = cv2.aruco.ArucoDetector(arucoDict, arucoParams)
-    # Detect the markers
     corners, ids, rejected = detector.detectMarkers(image)
 
     # pyimagesearch version
@@ -37,7 +36,7 @@ def find_color_card(image):
 
     # try to extract the coordinates of the color correction card
     try:
-        # otherwise, we've found the four ArUco markers, so we can
+        # We've found the four ArUco markers, so we can
         # continue by flattening the ArUco IDs list
         ids = ids.flatten()
 
@@ -89,23 +88,19 @@ class SaturationDirection(Enum):
 # will be either increased or decreased.
 # Returns Boolean (True == good threshold found), final saturation threshold
 
-##**TODO implemented as a recursive function but it may be clearer if
-# the recursion is "unrolled". [DEFER]
 ##**TODO How to make this function generic so that it will work on both
 # HSV and grayscale images - after all, both modify only a single
 # parameter: saturation threshold for HSV cv2.inRange() and grayscale
-# threshold for cv2.threshold(). In Java this would be a job for a
-# lambda.
+# threshold for cv2.threshold(). A Python lambda should work here;
+# Move this function to ImageUtils.
 def iterateThreshold(p_hsv_image, p_hsv_hue_low, p_hsv_hue_high, saturation_threshold, value_threshold,
                      saturation_direction,
-                     min_sample_area, max_sample_area,
-                     previous_below_min_area_contour_count, previous_rotated_rectangle_count):
+                     min_sample_area, max_sample_area):
     SAT_THRESHOLD_CHANGE = 5
 
     # Besides the target sample we'll allow a few contours below
     # the minimum area. These will be filtered out later.
-    ##**TODO should this be MAX_CONTOURS_BELOW_MIN_AREA and test against numBelowMinArea
-    MAX_CONTOURS = 10  # some may be zero length or not closed
+    MAX_CONTOURS_BELOW_MIN_AREA = 10  # some may be zero length or not closed
 
     # Try inRange with the passed-in saturation and value thresholds.
     # If these pass the non-zero pixel count filter and produce a
@@ -127,11 +122,11 @@ def iterateThreshold(p_hsv_image, p_hsv_hue_low, p_hsv_hue_high, saturation_thre
     #   the total number of contours is 0
     #   the total number of rotated rectangles within the area range is 0
     # The image is too busy if:
-    #   the total number of contours is above MAX_CONTOURS
+    #   the total number of contours is above MAX_CONTOURS_BELOW_MIN_AREA
     #   the total number of rotated rectangles is > 1
 
     # Take the desired case first.
-    if len(filtered_contours.filtered_binary_output) == 1 and filtered_contours.numUnfilteredContours <= MAX_CONTOURS and filtered_contours.numAboveMaxArea == 0:
+    if len(filtered_contours.filtered_binary_output) == 1 and filtered_contours.numBelowMinArea <= MAX_CONTOURS_BELOW_MIN_AREA and filtered_contours.numAboveMaxArea == 0:
         return True, saturation_threshold  # all good
 
     # If the thresholded image is too sparse then we need to
@@ -151,13 +146,12 @@ def iterateThreshold(p_hsv_image, p_hsv_hue_low, p_hsv_hue_high, saturation_thre
         next_sat_direction = SaturationDirection.DECREMENT
         return iterateThreshold(p_hsv_image, p_hsv_hue_low, p_hsv_hue_high, next_sat_threshold, value_threshold,
                                 next_sat_direction,
-                                min_sample_area, max_sample_area,
-                                filtered_contours.numBelowMinArea, len(filtered_contours.filtered_binary_output))
+                                min_sample_area, max_sample_area)
 
     # If the thresholded image is too busy or we've found more than
     # one qualifying rectangle or an oversized blob, then we need to
     # raise the saturation threshold.
-    if filtered_contours.numUnfilteredContours > MAX_CONTOURS or len(
+    if filtered_contours.numBelowMinArea > MAX_CONTOURS_BELOW_MIN_AREA or len(
             filtered_contours.filtered_binary_output) > 1 or filtered_contours.numAboveMaxArea != 0:
         if saturation_direction == SaturationDirection.DECREMENT:
             print("Error: reversal of saturation direction from decrement to increment")
@@ -173,8 +167,7 @@ def iterateThreshold(p_hsv_image, p_hsv_hue_low, p_hsv_hue_high, saturation_thre
         next_sat_direction = SaturationDirection.INCREMENT
         return iterateThreshold(p_hsv_image, hsv_hue_low, hsv_hue_high, next_sat_threshold, value_threshold,
                                 next_sat_direction,
-                                min_sample_area, max_sample_area,
-                                filtered_contours.numBelowMinArea, len(filtered_contours.filtered_binary_output))
+                                min_sample_area, max_sample_area)
 
     # failsafe
     print("Unhandled condition in iterateThreshold")
@@ -271,6 +264,17 @@ if ach != APERTURE_HEIGHT or acw != APERTURE_WIDTH:
     print("Aperture calibration image size does not match that of the card aperture")
     sys.exit(0)
 
+# Get the minimum and maximum saturation levels from the aperture.
+aperture_hsv = cv2.cvtColor(aperture_calibration_image, cv2.COLOR_BGR2HSV)
+aperture_h, aperture_sat, aperture_val = cv2.split(aperture_hsv)
+aperture_min_sat = np.min(aperture_sat)
+aperture_max_sat = np.max(aperture_sat)
+aperture_min_val = np.min(aperture_val)
+aperture_max_val = np.max(aperture_val)
+
+print("Aperture saturation minimum " + str(aperture_min_sat) + ", maximum " + str(aperture_max_sat))
+print("Aperture value minimum " + str(aperture_min_val) + ", maximum " + str(aperture_max_val))
+
 # Legacy images only: replace the color in the aperture with the color
 # from the calibration image, which is also 85x60.
 imageCard[aperture_y1: aperture_y2, aperture_x1: aperture_x2] = aperture_calibration_image
@@ -285,11 +289,7 @@ cv2.waitKey(0)
 aperture_mask = np.zeros((height, width), dtype=np.uint8)
 cv2.rectangle(aperture_mask, (aperture_x1, aperture_y1), (aperture_x2, aperture_y2), 255, cv2.FILLED)
 
-#cv2.imshow('Mask', aperture_mask)
-#cv2.waitKey(0)
-
 # Get the histogram of the color behind the aperture.
-# For this we don't need saturation and value.
 card_hsv = cv2.cvtColor(imageCard, cv2.COLOR_BGR2HSV)
 histSize = 180 # one bin for each OpenCV HSV hue value
 ranges = [0, 180]
@@ -311,8 +311,8 @@ plt.show()
 hsv_hue_low, hsv_hue_high = ImageUtils.get_hue_range(hist, dominant_bin_index)
 
 # We're using the color in the aperture to get the hue
-# range and then we're iterating over the full image
-# to get the saturation threshold.
+# range, then we're iterating over the full image to
+# get the saturation threshold.
 
 ##**TODO Verify assumptions:
 # Assumption: the hue range of the Pantone card aperture
@@ -321,10 +321,8 @@ hsv_hue_low, hsv_hue_high = ImageUtils.get_hue_range(hist, dominant_bin_index)
 # pseudo Pantone card with ArUco markers with an aperture
 # that includes the entire sample.
 
-# Assumption: we can ignore the saturation and value of
-# of the aperture and apply the hue range from the aperture
-# to the full image of a single sample while we iteratively
-# modify the saturation threshold.
+# Assumption: the hue range from the aperture will remain
+# valid when applied to the full image of a single sample.
 
 # Assumption: changes to the saturation threshold will not
 # affect the hue range.
@@ -342,8 +340,9 @@ target_min_sat = np.min(target_sat)
 target_max_sat = np.max(target_sat)
 target_min_val = np.min(target_val)
 target_max_val = np.max(target_val)
-print("Target saturation min, max", target_min_sat, target_max_sat)
-print("Target value min, max", target_min_val, target_max_val)
+
+print("Target saturation minimum " + str(target_min_sat) + ", maximum " + str(target_max_sat))
+print("Target value minimum " + str(target_min_val) + ", maximum " + str(target_max_val))
 
 ##**TODO Are there any cases where the thresholding starts
 # too high and we have to decrement?
@@ -356,7 +355,7 @@ SATURATION_LOW_DEFAULT = 125
 saturation_low = SATURATION_LOW_DEFAULT
 VALUE_LOW = 125
 
-if target_min_sat < SATURATION_LOW_DEFAULT:
+if aperture_min_sat < SATURATION_LOW_DEFAULT:
     saturation_low = MIN_SAT_THRESHOLD
 
 MIN_SAMPLE_AREA = 14000
@@ -364,10 +363,12 @@ MAX_SAMPLE_AREA = 21000
 
 status, last_saturation_threshold = iterateThreshold(target_hsv, hsv_hue_low, hsv_hue_high, saturation_low, VALUE_LOW,
                                                      SaturationDirection.INITIAL,
-                                                     MIN_SAMPLE_AREA, MAX_SAMPLE_AREA,
-                                                     0, 0)
+                                                     MIN_SAMPLE_AREA, MAX_SAMPLE_AREA)
 
-print("Last saturation threshold", str(last_saturation_threshold))
+print("Final HSV inRange parameters: ")
+print("Hue low " + str(hsv_hue_low) + ", hue high " + str(hsv_hue_high))
+print("Saturation threshold low " + str(last_saturation_threshold))
+print("Value threshold low " + str(VALUE_LOW))
 final_thresholded_image = ImageUtils.threshold_hsv(target_hsv, hsv_hue_low, hsv_hue_high, last_saturation_threshold, VALUE_LOW)
 if status:
     cv2.imshow("Final RotatedRect for sample at saturation threshold", final_thresholded_image)
