@@ -76,3 +76,56 @@ def four_point_transform(image, pts):
 
     # return the warped image
     return warped
+
+def find_color_card(image):
+    # load the ArUCo dictionary, grab the ArUCo parameters, and
+    # detect the markers in the input image
+
+    ## with release 4.7 this is the method ...
+    arucoDict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_ARUCO_ORIGINAL)
+    arucoParams = cv2.aruco.DetectorParameters()
+    detector = cv2.aruco.ArucoDetector(arucoDict, arucoParams)
+    corners, ids, rejected = detector.detectMarkers(image)
+
+    # pyimagesearch version
+    #arucoDict = cv2.aruco.Dictionary_get(cv2.aruco.DICT_ARUCO_ORIGINAL)
+    #arucoParams = cv2.aruco.DetectorParameters_create()
+    #(corners, ids, rejected) = cv2.aruco.detectMarkers(image,
+    #	arucoDict, parameters=arucoParams)
+
+    # try to extract the coordinates of the color correction card
+    try:
+        # We've found the four ArUco markers, so we can
+        # continue by flattening the ArUco IDs list
+        ids = ids.flatten()
+
+        # extract the top-left marker
+        i = np.squeeze(np.where(ids == 923))
+        topLeft = np.squeeze(corners[i])[0]
+
+        # extract the top-right marker
+        i = np.squeeze(np.where(ids == 1001))
+        topRight = np.squeeze(corners[i])[1]
+
+        # extract the bottom-right marker
+        i = np.squeeze(np.where(ids == 241))
+        bottomRight = np.squeeze(corners[i])[2]
+
+        # extract the bottom-left marker
+        i = np.squeeze(np.where(ids == 1007))
+        bottomLeft = np.squeeze(corners[i])[3]
+
+    # we could not find color correction card, so gracefully return
+    except Exception as e:
+        print(f"An unexpected error occurred: {e}")
+        return None
+
+    # build our list of reference points and apply a perspective
+    # transform to obtain a top-down, birds-eye-view of the color
+    # matching card
+    cardCoords = np.array([topLeft, topRight,
+        bottomRight, bottomLeft])
+    card = four_point_transform(image, cardCoords)
+
+    # return the color matching card to the calling function
+    return card
