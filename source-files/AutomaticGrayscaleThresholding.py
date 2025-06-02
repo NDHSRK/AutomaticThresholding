@@ -103,13 +103,17 @@ if aperture_calibration_image is None:
     sys.exit(1)
 
 # Test a color image with a single sample image against
-# our grayscale calibration.
+# our grayscale calibration. Typically this will be the
+# same full image of a single sample from which the
+# aperture calibration image was extracted via Gimp.
+# See the guidelines for more information.
 target_image_path = image_dir + target_image_filename
 target_image = cv2.imread(target_image_path, cv2.IMREAD_COLOR)
 if target_image is None:
     print('Target image file not found')
     sys.exit(1)
 
+# Now start processing.
 # According to the command line argument --source convert
 # the color calibration image to grayscale.
 try:
@@ -125,15 +129,18 @@ aperture_min_grayscale = np.min(aperture_grayscale)
 aperture_max_grayscale = np.max(aperture_grayscale)
 print("Aperture minimum grayscale " + str(aperture_min_grayscale) + ", maximum " + str(aperture_max_grayscale))
 
-aperture_bgr = cv2.cvtColor(aperture_grayscale, cv2.COLOR_GRAY2BGR)
+aperture_bgr = cv2.cvtColor(aperture_grayscale, cv2.COLOR_GRAY2BGR) # need BGR to merge with card image
 card_image, aperture_mask = aperture.prepare_aperture(pantone_image, aperture_calibration_image, aperture_bgr, image_dir)
 
-# Get the histogram of the grayscale behind the aperture.
+# Using the returned aperture mask, call calcHist to get the
+# histogram of the grayscale behind the aperture.
 card_grayscale = cv2.cvtColor(card_image, cv2.COLOR_BGR2GRAY)
-histSize = 256 # one bin for each OpenCV grayscale value
+
+# Set up for calcHist.
+histSize = 256 # one bin for each OpenCV grayscale value 0 - 255
 ranges = [0, 256]
 
-# [0] is the channel = hue; mask is the aperture; [180] is the number of bins; [0, 180] is the range
+# [0] is the channel = grayscale; mask is the aperture; [256] is the number of bins; [0, 256] is the range
 hist = cv2.calcHist([card_grayscale], [0], aperture_mask, [histSize], ranges)
 
 # The bin index and the grayscale value are the same because
@@ -156,25 +163,18 @@ target_min_grayscale = np.min(target_grayscale)
 target_max_grayscale = np.max(target_grayscale)
 print("Target minimum grayscale " + str(target_min_grayscale) + ", maximum " + str(target_max_grayscale))
 
-##**TODO Are there any cases where the thresholding starts
-# too high and we have to decrement?
-
 # It's better to start with a busy image and then gradually
-# increase the saturation to reduce the number of objects.
-# So if the minimum saturation of the image is below the
-# default then lower the default to create a busy image.
+# increase the grayscale threshold to reduce the number of
+# objects. So if the minimum grayscale of the aperture is
+# below the default then lower the default to create a busy
+# image.
 GRAYSCALE_LOW_DEFAULT = 125
 grayscale_low = GRAYSCALE_LOW_DEFAULT
 
 if aperture_min_grayscale < GRAYSCALE_LOW_DEFAULT:
     grayscale_low = MIN_GRAYSCALE_THRESHOLD
 
-##**TODO common -> ImageUtils.iterateThreshold
-MIN_SAMPLE_AREA = 14000
-MAX_SAMPLE_AREA = 21000
-
-status, last_grayscale_threshold = ImageUtils.iterateThreshold(lambda control_variable: grayscale_threshold_wrapper(target_grayscale, control_variable), grayscale_low, ImageUtils.ThresholdControlDirection.INITIAL,
-                                                    MIN_SAMPLE_AREA, MAX_SAMPLE_AREA)
+status, last_grayscale_threshold = ImageUtils.iterateThreshold(lambda control_variable: grayscale_threshold_wrapper(target_grayscale, control_variable), grayscale_low, ImageUtils.ThresholdControlDirection.INITIAL)
 
 print("Final grayscale threshold level: " + str(last_grayscale_threshold))
 final_thresholded_image = grayscale_threshold_wrapper(target_grayscale, last_grayscale_threshold)

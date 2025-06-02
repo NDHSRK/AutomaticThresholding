@@ -143,12 +143,18 @@ class ImageUtils:
     # caller should supply the saturation threshold as the control
     # variable; for grayscale the caller should supply the low
     # threshold value.
+
+    ##**TODO Are there any cases where the thresholding starts
+    # too high and we have to decrement?
+
     @staticmethod
-    def iterateThreshold(threshold_image_function, control_variable, control_direction,
-                         min_sample_area, max_sample_area):
+    def iterateThreshold(threshold_image_function, control_variable, control_direction):
         CONTROL_VARIABLE_CHANGE = 5
         MIN_CONTROL_VARIABLE = 25
         MAX_CONTROL_VARIABLE = 250
+
+        MIN_SAMPLE_AREA = 14000
+        MAX_SAMPLE_AREA = 21000
 
         # Besides the target sample we'll allow a few contours below
         # the minimum area. These will be filtered out later.
@@ -165,7 +171,7 @@ class ImageUtils:
 
         # Filter the contours and rotated rectangles.
         thr_height, thr_width = thresholded.shape
-        filtered_contours = ImageUtils.filter_contours(thresholded, thr_height, thr_width, min_sample_area, max_sample_area)
+        filtered_contours = ImageUtils.filter_contours(thresholded, thr_height, thr_width, MIN_SAMPLE_AREA, MAX_SAMPLE_AREA)
 
         # The image is too sparse if:
         #   the total number of contours is 0
@@ -195,8 +201,7 @@ class ImageUtils:
 
             # call self
             next_control_direction = ImageUtils.ThresholdControlDirection.DECREMENT
-            return ImageUtils.iterateThreshold(threshold_image_function, next_control_variable, next_control_direction,
-                                    min_sample_area, max_sample_area)
+            return ImageUtils.iterateThreshold(threshold_image_function, next_control_variable, next_control_direction)
 
         # If the thresholded image is too busy or we've found more than
         # one qualifying rectangle or an oversized blob, then we need to
@@ -215,8 +220,7 @@ class ImageUtils:
 
             # call self
             next_control_direction = ImageUtils.ThresholdControlDirection.INCREMENT
-            return ImageUtils.iterateThreshold(threshold_image_function, next_control_variable, next_control_direction,
-                                    min_sample_area, max_sample_area)
+            return ImageUtils.iterateThreshold(threshold_image_function, next_control_variable, next_control_direction)
 
         # failsafe
         print("Unhandled condition in iterateThreshold")
