@@ -27,7 +27,7 @@ class GrayscaleSource(Enum):
     COLOR_TO_GRAY = 6
 
 def select_grayscale(bgr_image, source_selection):
-    bgr_height, bgr_width, channels = bgr_image.shape
+    bgr_height, bgr_width, bgr_channels = bgr_image.shape
     xFF = np.ones((bgr_height, bgr_width, 1), dtype=np.uint8) * 255
 
     invert_selected_channel = False
@@ -77,13 +77,81 @@ class ThresholdControlDirection(Enum):
 # threshold value.
 def iterateThreshold(threshold_image_function, control_variable, control_direction,
                      min_sample_area, max_sample_area):
-  CONTROL_VARIABLE_CHANGE = 5
+    CONTROL_VARIABLE_CHANGE = 5
+    MIN_CONTROL_VARIABLE = 25
+    MAX_CONTROL_VARIABLE = 250
 
-  thresholded = threshold_image_function(control_variable)
+    # Besides the target sample we'll allow a few contours below
+    # the minimum area. These will be filtered out later.
+    MAX_CONTOURS_BELOW_MIN_AREA = 10  # some may be zero length or not closed
 
-  return thresholded # placeholder
+    thresholded = threshold_image_function(control_variable)
+    print("Current control variable " + str(control_variable))
 
+    thr_non_zero_count = cv2.countNonZero(thresholded) # information
+    print("Non-zero pixel count in thresholded image " + str(thr_non_zero_count))
 
+    # cv2.imshow("Thresholded", thresholded)
+    # cv2.waitKey(0)
+
+    # Filter the contours and rotated rectangles.
+    thr_height, thr_width = thresholded.shape
+    filtered_contours = ImageUtils.filter_contours(thresholded, thr_height, thr_width, min_sample_area, max_sample_area)
+
+    # The image is too sparse if:
+    #   the total number of contours is 0
+    #   the total number of rotated rectangles within the area range is 0
+    # The image is too busy if:
+    #   the total number of contours is above MAX_CONTOURS_BELOW_MIN_AREA
+    #   the total number of rotated rectangles is > 1
+
+    # Take the desired case first.
+    if len(filtered_contours.filtered_binary_output) == 1 and filtered_contours.numBelowMinArea <= MAX_CONTOURS_BELOW_MIN_AREA and filtered_contours.numAboveMaxArea == 0:
+        return True, control_variable  # all good
+
+    # If the thresholded image is too sparse then we need to
+    # lower the control variable.
+    if filtered_contours.numUnfilteredContours == 0:
+        if control_direction == ThresholdControlDirection.INCREMENT:
+            print("Error: reversal of control direction from increment to decrement")
+            return False, control_variable
+
+        # INITIAL or DECREMENT
+        next_control_variable = control_variable - CONTROL_VARIABLE_CHANGE
+        if next_control_variable < MIN_CONTROL_VARIABLE:
+            print("Error: below minimum control variable")
+            return False, control_variable
+
+        # call self
+        next_control_direction = ThresholdControlDirection.DECREMENT
+        return iterateThreshold(threshold_image_function, next_control_variable, next_control_direction,
+                                min_sample_area, max_sample_area)
+
+    # If the thresholded image is too busy or we've found more than
+    # one qualifying rectangle or an oversized blob, then we need to
+    # raise the control variable.
+    if filtered_contours.numBelowMinArea > MAX_CONTOURS_BELOW_MIN_AREA or len(
+            filtered_contours.filtered_binary_output) > 1 or filtered_contours.numAboveMaxArea != 0:
+        if control_direction == ThresholdControlDirection.DECREMENT:
+            print("Error: reversal of control direction from decrement to increment")
+            return False, control_variable
+
+        # INITIAL or INCREMENT
+        next_control_variable = control_variable + CONTROL_VARIABLE_CHANGE
+        if next_control_variable > MAX_CONTROL_VARIABLE:
+            print("Error: above maximum control variable")
+            return False, control_variable
+
+        # call self
+        next_control_direction = ThresholdControlDirection.INCREMENT
+        return iterateThreshold(threshold_image_function, next_control_variable, next_control_direction,
+                                min_sample_area, max_sample_area)
+
+    # failsafe
+    print("Unhandled condition in iterateThreshold")
+    sys.exit(1)  # OR raise exception
+
+##########################################################
 ## main ##
 
 # construct the argument parser and parse the arguments
@@ -235,10 +303,36 @@ plt.show()
 
 target_grayscale = select_grayscale(target_image, selected_grayscale_source)
 
+# For debugging get the minimum grayscale for the full image.
+target_min_grayscale = np.min(target_grayscale)
+target_max_grayscale = np.max(target_grayscale)
+print("Target minimum grayscale " + str(target_min_grayscale) + ", maximum " + str(target_max_grayscale))
 
+##**TODO Are there any cases where the thresholding starts
+# too high and we have to decrement?
+
+# It's better to start with a busy image and then gradually
+# increase the saturation to reduce the number of objects.
+# So if the minimum saturation of the image is below the
+# default then lower the default to create a busy image.
+GRAYSCALE_LOW_DEFAULT = 125
+grayscale_low = GRAYSCALE_LOW_DEFAULT
+
+if aperture_min_grayscale < GRAYSCALE_LOW_DEFAULT:
+    grayscale_low = MIN_GRAYSCALE_THRESHOLD
 
 MIN_SAMPLE_AREA = 14000
 MAX_SAMPLE_AREA = 21000
 
-#placeholder = iterateThreshold(lambda control_variable: grayscale_threshold_wrapper(target_grayscale), ThresholdControlDirection.INITIAL,
-#                                                     MIN_SAMPLE_AREA, MAX_SAMPLE_AREA)
+status, last_grayscale_threshold = iterateThreshold(lambda control_variable: grayscale_threshold_wrapper(target_grayscale, control_variable), grayscale_low, ThresholdControlDirection.INITIAL,
+                                                    MIN_SAMPLE_AREA, MAX_SAMPLE_AREA)
+
+print("Final grayscale threshold level: " + str(last_grayscale_threshold))
+final_thresholded_image = grayscale_threshold_wrapper(target_grayscale, last_grayscale_threshold)
+if status:
+    cv2.imshow("Final RotatedRect for sample at grayscale threshold", final_thresholded_image)
+    cv2.waitKey(0)
+else:
+    print("Unable to determine threshold levels")
+    cv2.imshow("Sample at time of error at grayscale threshold", final_thresholded_image)
+    cv2.waitKey(0)
