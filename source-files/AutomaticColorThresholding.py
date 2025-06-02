@@ -6,173 +6,18 @@
 # ArUco marker detection and perspective normalization.
 
 # import the necessary packages
-from perspective import four_point_transform
 import numpy as np
 import argparse
 import cv2
 import sys
-from enum import Enum
+import perspective
 from ImageUtils import ImageUtils
 import matplotlib.pyplot as plt
 
 MIN_SAT_THRESHOLD = 25
 MAX_SAT_THRESHOLD = 250
 
-def find_color_card(image):
-    # load the ArUCo dictionary, grab the ArUCo parameters, and
-    # detect the markers in the input image
-
-    ## with release 4.7 this is the method ...
-    arucoDict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_ARUCO_ORIGINAL)
-    arucoParams = cv2.aruco.DetectorParameters()
-    detector = cv2.aruco.ArucoDetector(arucoDict, arucoParams)
-    corners, ids, rejected = detector.detectMarkers(image)
-
-    # pyimagesearch version
-    #arucoDict = cv2.aruco.Dictionary_get(cv2.aruco.DICT_ARUCO_ORIGINAL)
-    #arucoParams = cv2.aruco.DetectorParameters_create()
-    #(corners, ids, rejected) = cv2.aruco.detectMarkers(image,
-    #	arucoDict, parameters=arucoParams)
-
-    # try to extract the coordinates of the color correction card
-    try:
-        # We've found the four ArUco markers, so we can
-        # continue by flattening the ArUco IDs list
-        ids = ids.flatten()
-
-        # extract the top-left marker
-        i = np.squeeze(np.where(ids == 923))
-        topLeft = np.squeeze(corners[i])[0]
-
-        # extract the top-right marker
-        i = np.squeeze(np.where(ids == 1001))
-        topRight = np.squeeze(corners[i])[1]
-
-        # extract the bottom-right marker
-        i = np.squeeze(np.where(ids == 241))
-        bottomRight = np.squeeze(corners[i])[2]
-
-        # extract the bottom-left marker
-        i = np.squeeze(np.where(ids == 1007))
-        bottomLeft = np.squeeze(corners[i])[3]
-
-    # we could not find color correction card, so gracefully return
-    except Exception as e:
-        print(f"An unexpected error occurred: {e}")
-        return None
-
-    # build our list of reference points and apply a perspective
-    # transform to obtain a top-down, birds-eye-view of the color
-    # matching card
-    cardCoords = np.array([topLeft, topRight,
-        bottomRight, bottomLeft])
-    card = four_point_transform(image, cardCoords)
-
-    # return the color matching card to the calling function
-    return card
-
-class SaturationDirection(Enum):
-         INITIAL = 0
-         INCREMENT = 1
-         DECREMENT = 2
-
-# Given an HSV image assumed to contain a single sample,
-# this function attempts to determine the cv2.inRange
-# parameters that will correctly threshold the sample.
-#
-# Input parameters are the HSV image, the low hue value,
-# the high hue value, the current saturation level, and
-# the current value level.
-
-# In this version of the function only the saturation threshold
-# will be either increased or decreased.
-# Returns Boolean (True == good threshold found), final saturation threshold
-
-##**TODO How to make this function generic so that it will work on both
-# HSV and grayscale images - after all, both modify only a single
-# parameter: saturation threshold for HSV cv2.inRange() and grayscale
-# threshold for cv2.threshold(). A Python lambda should work here;
-# Move this function to ImageUtils.
-def iterateThreshold(p_hsv_image, p_hsv_hue_low, p_hsv_hue_high, saturation_threshold, value_threshold,
-                     saturation_direction,
-                     min_sample_area, max_sample_area):
-    SAT_THRESHOLD_CHANGE = 5
-
-    # Besides the target sample we'll allow a few contours below
-    # the minimum area. These will be filtered out later.
-    MAX_CONTOURS_BELOW_MIN_AREA = 10  # some may be zero length or not closed
-
-    # Try inRange with the passed-in saturation and value thresholds.
-    # If these pass the non-zero pixel count filter and produce a
-    # single clean thresholded binary image with fewer than the maximum
-    # number of contours then we're done.
-
-    hsv_thr = ImageUtils.threshold_hsv(p_hsv_image, p_hsv_hue_low, p_hsv_hue_high, saturation_threshold, value_threshold)
-    thr_non_zero_count = cv2.countNonZero(hsv_thr)
-    print("HSV saturation threshold " + str(saturation_threshold))
-    print("Thresholded HSV non-zero pixel count " + str(thr_non_zero_count))
-    # cv2.imshow('Thresholded HSV', hsv_thr)
-    # cv2.waitKey(0)
-
-    # Filter the contours and rotated rectangles.
-    hsv_thr_height, hsv_thr_width = hsv_thr.shape
-    filtered_contours = ImageUtils.filter_contours(hsv_thr, hsv_thr_height, hsv_thr_width, min_sample_area, max_sample_area)
-
-    # The image is too sparse if:
-    #   the total number of contours is 0
-    #   the total number of rotated rectangles within the area range is 0
-    # The image is too busy if:
-    #   the total number of contours is above MAX_CONTOURS_BELOW_MIN_AREA
-    #   the total number of rotated rectangles is > 1
-
-    # Take the desired case first.
-    if len(filtered_contours.filtered_binary_output) == 1 and filtered_contours.numBelowMinArea <= MAX_CONTOURS_BELOW_MIN_AREA and filtered_contours.numAboveMaxArea == 0:
-        return True, saturation_threshold  # all good
-
-    # If the thresholded image is too sparse then we need to
-    # lower the saturation threshold.
-    if filtered_contours.numUnfilteredContours == 0:
-        if saturation_direction == SaturationDirection.INCREMENT:
-            print("Error: reversal of saturation direction from increment to decrement")
-            return False, saturation_threshold
-
-        # INITIAL or DECREMENT
-        next_sat_threshold = saturation_threshold - SAT_THRESHOLD_CHANGE
-        if next_sat_threshold < MIN_SAT_THRESHOLD:
-            print("Error: below minimum saturation threshold")
-            return False, saturation_threshold
-
-        # call self
-        next_sat_direction = SaturationDirection.DECREMENT
-        return iterateThreshold(p_hsv_image, p_hsv_hue_low, p_hsv_hue_high, next_sat_threshold, value_threshold,
-                                next_sat_direction,
-                                min_sample_area, max_sample_area)
-
-    # If the thresholded image is too busy or we've found more than
-    # one qualifying rectangle or an oversized blob, then we need to
-    # raise the saturation threshold.
-    if filtered_contours.numBelowMinArea > MAX_CONTOURS_BELOW_MIN_AREA or len(
-            filtered_contours.filtered_binary_output) > 1 or filtered_contours.numAboveMaxArea != 0:
-        if saturation_direction == SaturationDirection.DECREMENT:
-            print("Error: reversal of saturation direction from decrement to increment")
-            return False, saturation_threshold
-
-        # INITIAL or INCREMENT
-        next_sat_threshold = saturation_threshold + SAT_THRESHOLD_CHANGE
-        if next_sat_threshold > MAX_SAT_THRESHOLD:
-            print("Error: above maximum saturation threshold")
-            return False, saturation_threshold
-
-        # call self
-        next_sat_direction = SaturationDirection.INCREMENT
-        return iterateThreshold(p_hsv_image, hsv_hue_low, hsv_hue_high, next_sat_threshold, value_threshold,
-                                next_sat_direction,
-                                min_sample_area, max_sample_area)
-
-    # failsafe
-    print("Unhandled condition in iterateThreshold")
-    sys.exit(1)  # OR raise exception
-
+#########################################################
 ## main ##
 # construct the argument parser and parse the arguments
 ap = argparse.ArgumentParser()
@@ -226,7 +71,7 @@ pantone_image = cv2.resize(pantone_image, SCALED_CARD_SIZE, interpolation=cv2.IN
 
 # Find the color matching card in the input image
 print("Finding color matching card ...")
-imageCard = find_color_card(pantone_image)
+imageCard = perspective.find_color_card(pantone_image)
 
 # If the color matching card is not found, just in either the reference
 # exit.
@@ -361,9 +206,8 @@ if aperture_min_sat < SATURATION_LOW_DEFAULT:
 MIN_SAMPLE_AREA = 14000
 MAX_SAMPLE_AREA = 21000
 
-status, last_saturation_threshold = iterateThreshold(target_hsv, hsv_hue_low, hsv_hue_high, saturation_low, VALUE_LOW,
-                                                     SaturationDirection.INITIAL,
-                                                     MIN_SAMPLE_AREA, MAX_SAMPLE_AREA)
+status, last_saturation_threshold = ImageUtils.iterateThreshold(lambda control_variable: ImageUtils.threshold_hsv(target_hsv, hsv_hue_low, hsv_hue_high, control_variable, VALUE_LOW), saturation_low, ImageUtils.ThresholdControlDirection.INITIAL,
+                                                    MIN_SAMPLE_AREA, MAX_SAMPLE_AREA)
 
 print("Final HSV inRange parameters: ")
 print("Hue low " + str(hsv_hue_low) + ", hue high " + str(hsv_hue_high))
