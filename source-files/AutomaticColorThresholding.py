@@ -120,14 +120,19 @@ aperture_max_val = np.max(aperture_val)
 print("Aperture saturation minimum " + str(aperture_min_sat) + ", maximum " + str(aperture_max_sat))
 print("Aperture value minimum " + str(aperture_min_val) + ", maximum " + str(aperture_max_val))
 
-# Legacy images only: replace the color in the aperture with the color
+# Replace the color in the aperture with the color
 # from the calibration image, which is also 85x60.
 imageCard[aperture_y1: aperture_y2, aperture_x1: aperture_x2] = aperture_calibration_image
 
-# Write and show the color matching card adjusted for perspective.
+# Write and show the color matching card adjusted for perspective
+# # with our selected color in the aperture.
 cv2.imwrite(image_dir + "Pantone_01_aruco_.png", imageCard)
 cv2.imshow("Pantone card with calibration aperture", imageCard)
 cv2.waitKey(0)
+
+##**TODO "in the wild" you would get an image of the card
+# with the selected color in the aperture. So you would
+# need a mask to isolate the aperture.
 
 # Create a mask for the histogram by drawing a filled rectangle
 # over the aperture.
