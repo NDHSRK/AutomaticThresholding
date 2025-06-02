@@ -125,7 +125,12 @@ except KeyError:
 
 aperture_grayscale = select_grayscale(aperture_calibration_image, selected_grayscale_source)
 
-##**TODO Some of this replicates the color path
+# Get the minimum and maximum grayscale levels from the aperture.
+aperture_min_grayscale = np.min(aperture_grayscale)
+aperture_max_grayscale = np.max(aperture_grayscale)
+print("Aperture minimum grayscale " + str(aperture_min_grayscale) + ", maximum " + str(aperture_max_grayscale))
+
+##**TODO replicates the color path -> aperture.py
 # The Pantone card image is 3024x4032. Use the scaling factor
 # from pyimagesearch.
 SCALED_CARD_WIDTH = 600
@@ -171,11 +176,7 @@ ach, acw, _ = aperture_calibration_image.shape
 if ach != APERTURE_HEIGHT or acw != APERTURE_WIDTH:
     print("Aperture calibration image size does not match that of the card aperture")
     sys.exit(0)
-
-# Get the minimum and maximum grayscale levels from the aperture.
-aperture_min_grayscale = np.min(aperture_grayscale)
-aperture_max_grayscale = np.max(aperture_grayscale)
-print("Aperture minimum grayscale " + str(aperture_min_grayscale) + ", maximum " + str(aperture_max_grayscale))
+##**TODO end common return roi = imageCard[aperture_y1: aperture_y2, aperture_x1: aperture_x2]
 
 # Legacy images only: replace the color in the aperture with the grayscale
 # from the calibration image, which is also 85x60.
@@ -200,8 +201,8 @@ ranges = [0, 256]
 # [0] is the channel = hue; mask is the aperture; [180] is the number of bins; [0, 180] is the range
 hist = cv2.calcHist([card_grayscale], [0], aperture_mask, [histSize], ranges)
 
-# The bin index and the hue are the same because we've allocated 256 bins,
-# one for each grayscale value.
+# The bin index and the grayscale value are the same because
+# we've allocated 256 bins, one for each grayscale value.
 dominant_bin_index = np.argmax(hist)
 print("Dominant grayscale/bin " + str(dominant_bin_index))
 
@@ -211,6 +212,7 @@ plt.xlabel('Pixel Intensity')
 plt.ylabel('Pixel Count')
 plt.show()
 
+# Get the grayscale channel for the full image.
 target_grayscale = select_grayscale(target_image, selected_grayscale_source)
 
 # For debugging get the minimum grayscale for the full image.
@@ -231,6 +233,7 @@ grayscale_low = GRAYSCALE_LOW_DEFAULT
 if aperture_min_grayscale < GRAYSCALE_LOW_DEFAULT:
     grayscale_low = MIN_GRAYSCALE_THRESHOLD
 
+##**TODO common
 MIN_SAMPLE_AREA = 14000
 MAX_SAMPLE_AREA = 21000
 
