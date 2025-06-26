@@ -1,5 +1,5 @@
 # AutomaticThresholding
- PyCharm project for automatic thresholding of IntoTheDeep samples.  
+ PyCharm project for the automatic thresholding of IntoTheDeep samples.  
 
 The alpha release this project focuses on determining the HSV color
 thresholding (cv2.inRange) parameters for a single FTC IntoTheDeep

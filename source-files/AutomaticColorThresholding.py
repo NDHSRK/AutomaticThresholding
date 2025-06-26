@@ -126,13 +126,13 @@ if aperture_min_sat < SATURATION_LOW_DEFAULT:
 MIN_SAMPLE_AREA = 14000
 MAX_SAMPLE_AREA = 21000
 
-status, last_saturation_threshold = ImageUtils.iterateThreshold(lambda control_variable: ImageUtils.threshold_hsv(target_hsv, hsv_hue_low, hsv_hue_high, control_variable, VALUE_LOW), saturation_low, ImageUtils.ThresholdControlDirection.INITIAL)
+status, last_saturation_threshold = ImageUtils.iterateThreshold(lambda control_variable: ImageUtils.apply_inRange(target_hsv, hsv_hue_low, hsv_hue_high, control_variable, VALUE_LOW), saturation_low, ImageUtils.ThresholdControlDirection.INITIAL)
 
 print("Final HSV inRange parameters: ")
 print("Hue low " + str(hsv_hue_low) + ", hue high " + str(hsv_hue_high))
 print("Saturation threshold low " + str(last_saturation_threshold))
 print("Value threshold low " + str(VALUE_LOW))
-final_thresholded_image = ImageUtils.threshold_hsv(target_hsv, hsv_hue_low, hsv_hue_high, last_saturation_threshold, VALUE_LOW)
+final_thresholded_image = ImageUtils.apply_inRange(target_hsv, hsv_hue_low, hsv_hue_high, last_saturation_threshold, VALUE_LOW)
 if status:
     cv2.imshow("Final RotatedRect for sample at saturation threshold", final_thresholded_image)
     cv2.waitKey(0)
