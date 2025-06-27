@@ -11,7 +11,7 @@ class ImageUtils:
 
     ## From FtcIntoTheDeepLimelight.ImageUtils; renamed from threshold_adjusted_hsv
     @staticmethod
-    def apply_inRange(p_hsv_roi, hue_low, hue_high, sat_threshold_low, val_threshold_low):
+    def applyInRange(p_hsv_roi, hue_low, hue_high, sat_threshold_low, val_threshold_low):
         # Sanity check for hue.
         if not ((0 <= hue_low <= 180) and (0 <= hue_high <= 180)):
             raise Exception("Hue out of range")
