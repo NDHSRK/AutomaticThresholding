@@ -96,9 +96,9 @@ if pantone_image is None:
 # in the center of the Pantone card. For this proof-of-concept
 # this image must created manually in Gimp from an image of a
 # single sample taken at some earlier date and time.
-aperture_calibration_path = image_dir + aperture_calibration_filename
-aperture_calibration_image = cv2.imread(aperture_calibration_path, cv2.IMREAD_COLOR)
-if aperture_calibration_image is None:
+aperture_replacement_path = image_dir + aperture_calibration_filename
+aperture_replacement_image = cv2.imread(aperture_replacement_path, cv2.IMREAD_COLOR)
+if aperture_replacement_image is None:
     print('Aperture calibration image file not found')
     sys.exit(1)
 
@@ -122,15 +122,15 @@ except KeyError:
   print("No such grayscale source")
   sys.exit(1)
 
-aperture_grayscale = select_grayscale(aperture_calibration_image, selected_grayscale_source)
+aperture_grayscale = select_grayscale(aperture_replacement_image, selected_grayscale_source)
 
 # Get the minimum and maximum grayscale levels from the aperture.
 aperture_min_grayscale = np.min(aperture_grayscale)
 aperture_max_grayscale = np.max(aperture_grayscale)
 print("Aperture minimum grayscale " + str(aperture_min_grayscale) + ", maximum " + str(aperture_max_grayscale))
 
-aperture_bgr = cv2.cvtColor(aperture_grayscale, cv2.COLOR_GRAY2BGR) # need BGR to merge with card image
-card_image, aperture_mask = aperture.prepare_aperture(pantone_image, aperture_calibration_image, aperture_bgr, image_dir)
+aperture_replacement_bgr = cv2.cvtColor(aperture_grayscale, cv2.COLOR_GRAY2BGR) # need BGR to merge with card image
+card_image, aperture_mask = aperture.prepare_aperture(pantone_image, aperture_replacement_bgr, image_dir)
 
 # Using the returned aperture mask, call calcHist to get the
 # histogram of the grayscale behind the aperture.

@@ -3,7 +3,7 @@ import cv2
 import sys
 import perspective
 
-def prepare_aperture(p_pantone_image, p_aperture_calibration_image, p_aperture_image_replacement, p_image_dir):
+def prepare_aperture(p_pantone_image, p_aperture_image_replacement, p_image_dir):
     # The Pantone card image is 3024x4032. Use the scaling factor
     # from pyimagesearch.
     SCALED_CARD_WIDTH = 600
@@ -14,6 +14,9 @@ def prepare_aperture(p_pantone_image, p_aperture_calibration_image, p_aperture_i
     # Find the color matching card in the input image
     print("Finding color matching card ...")
     card_image = perspective.find_color_card(pantone_image)
+    cv2.imwrite(p_image_dir + "Pantone_01_cropped.png", card_image)
+    cv2.imshow("Pantone card cropped to ArUco markers", card_image)
+    cv2.waitKey(0)
 
     # If the color matching card is not found, just exit.
     if card_image is None:
@@ -44,16 +47,18 @@ def prepare_aperture(p_pantone_image, p_aperture_calibration_image, p_aperture_i
 
     # The aperture calibration image must have the same dimensions
     # as the aperture in the calibration card.
-    ach, acw, _ = p_aperture_calibration_image.shape
+    ach, acw, _ = p_aperture_image_replacement.shape
     if ach != APERTURE_HEIGHT or acw != APERTURE_WIDTH:
-        print("Aperture calibration image size does not match that of the card aperture")
+        print("Aperture replacement image size does not match that of the card aperture")
         sys.exit(0)
 
+    # Replace the original color swatch under the aperture with
+    # the swatch from our sample.
     card_image[aperture_y1: aperture_y2, aperture_x1: aperture_x2] = p_aperture_image_replacement
 
     # Write and show the color matching card adjusted for perspective.
-    cv2.imwrite(p_image_dir + "Pantone_01_aruco_.png", card_image)
-    cv2.imshow("Pantone card with calibration aperture", card_image)
+    cv2.imwrite(p_image_dir + "Pantone_01_calibration_aperture.png", card_image)
+    cv2.imshow("Pantone card with calibration color in aperture", card_image)
     cv2.waitKey(0)
 
     # Create a mask for the histogram by drawing a filled rectangle

@@ -9,7 +9,7 @@
 # front_webcam_01131510_53687_IMG.png. The hue
 # range in the aperture is 103 to 109 while the
 # range of the full sample is more like 100 to 115.
-# We need a separate tester the verifiy this.
+# We need a separate tester the verify this.
 # Note that the range of 110, 115 correctly detects
 # the blue sample in front_webcam_01131443_18886_IMG.png,
 # which contains samples of all three colors.

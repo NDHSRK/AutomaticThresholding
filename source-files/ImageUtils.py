@@ -11,7 +11,7 @@ class ImageUtils:
 
     ## From FtcIntoTheDeepLimelight.ImageUtils; renamed from threshold_adjusted_hsv
     @staticmethod
-    def applyInRange(p_hsv_roi, hue_low, hue_high, sat_threshold_low, val_threshold_low):
+    def apply_inRange(p_hsv_roi, hue_low, hue_high, sat_threshold_low, val_threshold_low):
         # Sanity check for hue.
         if not ((0 <= hue_low <= 180) and (0 <= hue_high <= 180)):
             raise Exception("Hue out of range")
@@ -158,7 +158,7 @@ class ImageUtils:
 
         # Besides the target sample we'll allow a few contours below
         # the minimum area. These will be filtered out later.
-        MAX_CONTOURS_BELOW_MIN_AREA = 10  # some may be zero length or not closed
+        MAX_CONTOURS_BELOW_MIN_AREA = 5  # some may be zero length or not closed
 
         thresholded = threshold_image_function(control_variable)
         print("Current control variable " + str(control_variable))
@@ -166,8 +166,8 @@ class ImageUtils:
         thr_non_zero_count = cv2.countNonZero(thresholded) # information
         print("Non-zero pixel count in thresholded image " + str(thr_non_zero_count))
 
-        # cv2.imshow("Thresholded", thresholded)
-        # cv2.waitKey(0)
+        #cv2.imshow("Thresholded", thresholded)
+        #cv2.waitKey(0)
 
         # Filter the contours and rotated rectangles.
         thr_height, thr_width = thresholded.shape
