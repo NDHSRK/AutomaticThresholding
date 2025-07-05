@@ -129,12 +129,12 @@ print("Target value minimum " + str(target_min_val) + ", maximum " + str(target_
 # So if the minimum saturation of the image is below the
 # default then lower the default to create a busy image.
 target_saturation_low = target_min_sat
-VALUE_LOW = 125
+target_value_low = target_min_val
 
 MIN_SAMPLE_AREA = 14000
 MAX_SAMPLE_AREA = 21000
 
-status, last_saturation_threshold = ImageUtils.iterateThreshold(lambda control_variable: ImageUtils.apply_inRange(target_hsv, hsv_hue_low, hsv_hue_high, control_variable, VALUE_LOW), target_saturation_low, ImageUtils.ThresholdControlDirection.INITIAL)
+status, last_saturation_threshold = ImageUtils.iterateThreshold(lambda control_variable: ImageUtils.apply_inRange(target_hsv, hsv_hue_low, hsv_hue_high, control_variable, target_value_low), target_saturation_low, ImageUtils.ThresholdControlDirection.INITIAL)
 
 ##**TODO After the saturation argument has been determined it looks possible to iterate
 # over HSV value starting at the target min_value and walking upward.
@@ -144,8 +144,8 @@ status, last_saturation_threshold = ImageUtils.iterateThreshold(lambda control_v
 print("Final HSV inRange parameters: ")
 print("Hue low " + str(hsv_hue_low) + ", hue high " + str(hsv_hue_high))
 print("Saturation threshold low " + str(last_saturation_threshold))
-print("Value threshold low " + str(VALUE_LOW))
-final_thresholded_image = ImageUtils.apply_inRange(target_hsv, hsv_hue_low, hsv_hue_high, last_saturation_threshold, VALUE_LOW)
+print("Value threshold low " + str(target_value_low))
+final_thresholded_image = ImageUtils.apply_inRange(target_hsv, hsv_hue_low, hsv_hue_high, last_saturation_threshold, target_value_low)
 if status:
     cv2.imshow("Final RotatedRect for sample at saturation threshold", final_thresholded_image)
     cv2.waitKey(0)
