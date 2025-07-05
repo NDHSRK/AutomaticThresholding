@@ -46,7 +46,7 @@ if pantone_image is None:
 aperture_replacement_path = image_dir + aperture_replacement_filename
 aperture_replacement_image = cv2.imread(aperture_replacement_path, cv2.IMREAD_COLOR)
 if aperture_replacement_image is None:
-    print('Aperture calibration image file not found')
+    print('Aperture replacement image file not found')
     sys.exit(1)
 
 # Test a color image with a single sample image against
@@ -110,10 +110,6 @@ cv2.waitKey(0)
 # Double-check to make sure there's no interference from the rest
 # of the image outside the swatch.
 
-# We're using the color in the aperture to get the hue
-# range, then we're iterating over the full image to
-# get the saturation threshold.
-
 # Split and get the minimum saturation for the full image.
 target_h, target_sat, target_val = cv2.split(target_hsv)
 target_min_sat = np.min(target_sat)
@@ -123,6 +119,10 @@ target_max_val = np.max(target_val)
 
 print("Target saturation minimum " + str(target_min_sat) + ", maximum " + str(target_max_sat))
 print("Target value minimum " + str(target_min_val) + ", maximum " + str(target_max_val))
+
+# Use the color in the aperture to get the hue
+# range, then iterate over the full image to
+# get the saturation threshold.
 
 # It's better to start with a busy image and then gradually
 # increase the saturation to reduce the number of objects.

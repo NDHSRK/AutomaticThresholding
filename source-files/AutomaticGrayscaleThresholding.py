@@ -67,7 +67,6 @@ def grayscale_threshold_wrapper(p_grayscale_image, grayscale_threshold_low):
 # construct the argument parser and parse the arguments
 ap = argparse.ArgumentParser()
 ap.add_argument("--image_dir", type=str)
-ap.add_argument("--hsv", action="store_true")
 ap.add_argument("--gray", action="store_true")
 ap.add_argument("--source", type=str) # only with --gray
 ap.add_argument("--aperture", type=str)
@@ -79,7 +78,7 @@ if not args["gray"] or args["source"] is None:
     sys.exit(1)
 
 image_dir = args["image_dir"]
-aperture_calibration_filename = args["aperture"]
+aperture_replacement_filename = args["aperture"]
 target_image_filename = args["target"]
 
 # Read in any Pantone image from pyimagesearch because
@@ -96,10 +95,10 @@ if pantone_image is None:
 # in the center of the Pantone card. For this proof-of-concept
 # this image must created manually in Gimp from an image of a
 # single sample taken at some earlier date and time.
-aperture_replacement_path = image_dir + aperture_calibration_filename
+aperture_replacement_path = image_dir + aperture_replacement_filename
 aperture_replacement_image = cv2.imread(aperture_replacement_path, cv2.IMREAD_COLOR)
 if aperture_replacement_image is None:
-    print('Aperture calibration image file not found')
+    print('Aperture replacement image file not found')
     sys.exit(1)
 
 # Test a color image with a single sample image against
@@ -123,12 +122,6 @@ except KeyError:
   sys.exit(1)
 
 aperture_grayscale = select_grayscale(aperture_replacement_image, selected_grayscale_source)
-
-# Get the minimum and maximum grayscale levels from the aperture.
-aperture_min_grayscale = np.min(aperture_grayscale)
-aperture_max_grayscale = np.max(aperture_grayscale)
-print("Aperture minimum grayscale " + str(aperture_min_grayscale) + ", maximum " + str(aperture_max_grayscale))
-
 aperture_replacement_bgr = cv2.cvtColor(aperture_grayscale, cv2.COLOR_GRAY2BGR) # need BGR to merge with card image
 card_image, aperture_mask = aperture.prepare_aperture(pantone_image, aperture_replacement_bgr, image_dir)
 
@@ -154,25 +147,37 @@ plt.xlabel('Pixel Intensity')
 plt.ylabel('Pixel Count')
 plt.show()
 
+# Get the minimum and maximum grayscale levels from the aperture.
+aperture_min_grayscale = np.min(aperture_grayscale)
+aperture_max_grayscale = np.max(aperture_grayscale)
+print("Aperture minimum grayscale " + str(aperture_min_grayscale) + ", maximum " + str(aperture_max_grayscale))
+
 # According to the command line argument --source convert
 # the color full image target to grayscale.
 target_grayscale = select_grayscale(target_image, selected_grayscale_source)
 
-# For debugging get the minimum grayscale for the full image.
+# Perform a preliminary threshold of the full sample image using arguments from the aperture swatch.
+_, preliminary_threshold = cv2.threshold(target_grayscale, aperture_min_grayscale, 255, cv2.THRESH_BINARY)
+
+cv2.imshow("Preliminary threshold of the full image", preliminary_threshold)
+cv2.waitKey(0)
+
+# Double-check to make sure there's no interference from the rest
+# of the image outside the swatch.
+
+# For comparison get the minimum grayscale for the full image.
 target_min_grayscale = np.min(target_grayscale)
 target_max_grayscale = np.max(target_grayscale)
 print("Target minimum grayscale " + str(target_min_grayscale) + ", maximum " + str(target_max_grayscale))
+
+# Iterate over the full image to get the low threshold.
 
 # It's better to start with a busy image and then gradually
 # increase the grayscale threshold to reduce the number of
 # objects. So if the minimum grayscale of the aperture is
 # below the default then lower the default to create a busy
 # image.
-GRAYSCALE_LOW_DEFAULT = 125
-grayscale_low = GRAYSCALE_LOW_DEFAULT
-
-if aperture_min_grayscale < GRAYSCALE_LOW_DEFAULT:
-    grayscale_low = MIN_GRAYSCALE_THRESHOLD
+grayscale_low = target_min_grayscale
 
 status, last_grayscale_threshold = ImageUtils.iterateThreshold(lambda control_variable: grayscale_threshold_wrapper(target_grayscale, control_variable), grayscale_low, ImageUtils.ThresholdControlDirection.INITIAL)
 
