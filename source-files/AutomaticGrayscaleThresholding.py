@@ -18,12 +18,12 @@ MIN_GRAYSCALE_THRESHOLD = 25
 MAX_GRAYSCALE_THRESHOLD = 250
 
 class GrayscaleSource(Enum):
-    RED_CHANNEL = 0
-    RED_CHANNEL_INVERTED = 1,
+    BLUE_CHANNEL = 0
+    BLUE_CHANNEL_INVERTED = 1,
     GREEN_CHANNEL = 2
     GREEN_CHANNEL_INVERTED = 3,
-    BLUE_CHANNEL = 4
-    BLUE_CHANNEL_INVERTED = 5,
+    RED_CHANNEL = 4
+    RED_CHANNEL_INVERTED = 5,
     COLOR_TO_GRAY = 6
 
 def select_grayscale(bgr_image, source_selection):
