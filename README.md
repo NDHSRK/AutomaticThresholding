@@ -65,7 +65,7 @@ To remedy this problem we had to change the saturation low argument from 125 to 
 
 ## Automatic thresholding
 
-At both the Southern California Regional and the world Championship it was both time-consuming and stressful
+At both the Southern California Regional and the world Championship it was time-consuming and stressful
 to analyze images with stand-alone tools to figure out which inRange() arguments to change and by how much.
 
 The AutomaticThresholding project is based on
@@ -103,13 +103,20 @@ Remember, this is a proof-of-concept; we'll talk about how to automate this proc
 
 4. Determine the HSV saturation by iteration.
 
-After hue, saturation has the most effect on thresholding. To get the optimal parameters for saturation and value we start with a low saturation parameter of 62 and a low value parameter of 94, which are the minimum saturation and value levels for the full image. We then apply inRange(), OpenCV findContours(), and minAreaRect (to get RotatedRectangles) and check the results. What we're looking for is a single RotatedRectangle and a minimum number of low-area artifacts (specks). If the result is not in range then we change the saturation level either up or down and try again.
+After hue, saturation has the most effect on thresholding. We start with
+a low  saturation parameter of 62, which is the minimum saturation for
+the full image.
+We then apply inRange(), OpenCV findContours(), and minAreaRect
+(to get RotatedRectangles) and check the results. What we're looking
+for is a single RotatedRectangle and a minimum number of low-area
+artifacts (specks). If the result is not in range then we change the
+saturation level either up or down and try again.
 
-For the full image of the blue sample, LRS0416110156762052820652107.png
-Final HSV inRange parameters: 
-Hue low 107, hue high 121
-Saturation threshold low 207
-Value threshold low 94
+For the full image of the blue sample, LRS0416110156762052820652107.png,
+we get the following final HSV inRange parameters: 
+hue low 107, hue high 121;
+saturation threshold low 207;
+value threshold low 94
 
 When we apply these HSV arguments to the full image of the single blue sample, including the reddish halo,
 we get the following binary result.
@@ -125,8 +132,9 @@ These can be eliminated by 1. further tuning the saturation algorithm
 
 5. For the time being do not tune the HSV value argument.
 
-Currently in the code the HSV value argument is set to the minimum value level for the full image,
-which produces usable results. There is a TODO in the code that mentions
+Currently in the code the HSV value argument is set to the minimum 
+value level for the full image and is left unchanged.
+There is a TODO in the code that mentions
 the possibility of tuning the value argument using the same iterative
 approach as that for saturation. We'll wait for the 2025 - 2026 game
 announcement to decide whether this refinement is necessary.
